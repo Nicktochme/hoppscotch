@@ -1,5 +1,7 @@
 import { Environment } from "@hoppscotch/data";
 import { getEffectiveFinalMetaData } from "../../../utils/getters";
+import { describe, expect, test } from "vitest";
+
 
 import "@relmify/jest-fp-ts";
 

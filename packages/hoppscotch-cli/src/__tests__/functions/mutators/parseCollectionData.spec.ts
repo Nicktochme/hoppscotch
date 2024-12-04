@@ -1,10 +1,12 @@
 import { HoppCLIError } from "../../../types/errors";
 import { parseCollectionData } from "../../../utils/mutators";
+import { describe, expect, test } from "vitest";
+
 
 describe("parseCollectionData", () => {
   test("Reading non-existing file.", () => {
     return expect(
-      parseCollectionData("./src/__tests__/samples/notexist.json")
+      parseCollectionData("./src/__tests__/samples/notexist.json", {})
     ).rejects.toMatchObject(<HoppCLIError>{
       code: "FILE_NOT_FOUND",
     });
@@ -12,7 +14,7 @@ describe("parseCollectionData", () => {
 
   test("Unparseable JSON contents.", () => {
     return expect(
-      parseCollectionData("./src/__tests__/samples/malformed-collection.json")
+      parseCollectionData("./src/__tests__/e2e/fixtures/collections/malformed-coll.json", {})
     ).rejects.toMatchObject(<HoppCLIError>{
       code: "UNKNOWN_ERROR",
     });
@@ -20,9 +22,7 @@ describe("parseCollectionData", () => {
 
   test("Invalid HoppCollection.", () => {
     return expect(
-      parseCollectionData(
-        "./src/__tests__/samples/malformed-collection2.json"
-      )
+      parseCollectionData("./src/__tests__/e2e/fixtures/collections/malformed-coll-2.json", {})
     ).rejects.toMatchObject(<HoppCLIError>{
       code: "MALFORMED_COLLECTION",
     });
@@ -30,7 +30,7 @@ describe("parseCollectionData", () => {
 
   test("Valid HoppCollection.", () => {
     return expect(
-      parseCollectionData("./src/__tests__/samples/passes.json")
+      parseCollectionData("./src/__tests__/e2e/fixtures/collections/passes-coll.json", {})
     ).resolves.toBeTruthy();
   });
 });

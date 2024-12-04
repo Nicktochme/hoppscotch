@@ -1,4 +1,6 @@
 import { isHoppErrnoException } from "../../../utils/checks";
+import { describe, expect, test } from "vitest";
+
 
 describe("isHoppErrnoException", () => {
   test("NULL exception value.", () => {

@@ -4,6 +4,8 @@ import * as E from "fp-ts/Either";
 import { HoppCLIError } from "../../../types/errors";
 import { EffectiveHoppRESTRequest } from "../../../interfaces/request";
 import { preRequestScriptRunner } from "../../../utils/pre-request";
+import { describe, expect, test, beforeAll } from "vitest";
+
 
 import "@relmify/jest-fp-ts";
 

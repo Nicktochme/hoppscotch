@@ -2,6 +2,8 @@ import { Environment, HoppRESTRequest } from "@hoppscotch/data";
 import { EffectiveHoppRESTRequest } from "../../../interfaces/request";
 import { HoppCLIError } from "../../../types/errors";
 import { getEffectiveRESTRequest } from "../../../utils/pre-request";
+import { describe, expect, test, beforeEach } from "vitest";
+
 
 import "@relmify/jest-fp-ts";
 

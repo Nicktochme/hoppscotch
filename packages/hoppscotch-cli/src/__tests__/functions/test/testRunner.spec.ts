@@ -4,8 +4,8 @@ import { TestRunnerRes } from "../../../types/response";
 import { HoppCLIError } from "../../../types/errors";
 import { getTestMetrics, testRunner } from "../../../utils/test";
 import { HoppEnvs } from "../../../types/request";
+import { describe, expect, beforeAll, it } from "vitest";
 
-import "@relmify/jest-fp-ts";
 
 const SAMPLE_ENVS: HoppEnvs = {
   global: [],
@@ -13,6 +13,7 @@ const SAMPLE_ENVS: HoppEnvs = {
     {
       key: "DEVBLIN",
       value: "set-by-devblin",
+      secret: false,
     },
   ],
 };

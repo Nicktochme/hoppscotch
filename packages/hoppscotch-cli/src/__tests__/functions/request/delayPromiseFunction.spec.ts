@@ -1,6 +1,8 @@
 import { hrtime } from "process";
 import { getDurationInSeconds } from "../../../utils/getters";
 import { delayPromiseFunction } from "../../../utils/request";
+import { describe, expect, it, beforeEach } from "vitest";
+
 
 describe("describePromiseFunction", () => {
   let promiseFunc = (): Promise<number> => new Promise((resolve) => resolve(2));

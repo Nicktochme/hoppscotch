@@ -2,8 +2,9 @@ import { TestDescriptor } from "@hoppscotch/js-sandbox";
 import { testDescriptorParser, getTestMetrics } from "../../../utils/test";
 import { TestReport } from "../../../interfaces/response";
 import { TestMetrics } from "../../../types/response";
+import { describe, expect, beforeAll, it } from "vitest";
 
-import "@relmify/jest-fp-ts";
+
 
 const SAMPLE_TEST_DESCRIPTOR: TestDescriptor = {
   descriptor: "Status code is 200",

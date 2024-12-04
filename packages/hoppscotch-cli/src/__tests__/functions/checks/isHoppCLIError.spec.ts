@@ -1,4 +1,5 @@
 import { isHoppCLIError } from "../../../utils/checks";
+import { describe, expect, test } from "vitest";
 
 describe("isHoppCLIError", () => {
   test("NULL error value.", () => {
