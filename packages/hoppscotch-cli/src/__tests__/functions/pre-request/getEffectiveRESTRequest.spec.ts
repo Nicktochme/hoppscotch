@@ -5,7 +5,7 @@ import { getEffectiveRESTRequest } from "../../../utils/pre-request";
 import { describe, expect, test, beforeEach } from "vitest";
 
 
-import "@relmify/jest-fp-ts";
+//import "@relmify/jest-fp-ts";
 
 const DEFAULT_ENV = <Environment>{
   name: "name",
@@ -25,6 +25,7 @@ const DEFAULT_REQUEST = <HoppRESTRequest>{
   v: "1",
   name: "name",
   method: "GET",
+  requestVariables: [],
   endpoint: "https://example.com",
   params: [],
   headers: [],
@@ -53,6 +54,7 @@ describe("getEffectiveRESTRequest", () => {
         key: "HEADER",
         value: "<<UNKNOWN>>",
         active: true,
+        description: "",
       },
     ];
     SAMPLE_REQUEST.params = [
@@ -60,6 +62,7 @@ describe("getEffectiveRESTRequest", () => {
         key: "PARAM",
         value: "<<UNKNOWN>>",
         active: true,
+        description: "",
       },
     ];
     SAMPLE_REQUEST.endpoint = "<<UNKNOWN>>";
@@ -108,6 +111,7 @@ describe("getEffectiveRESTRequest", () => {
         key: "HEADER",
         value: "<<HEADER>>",
         active: true,
+        description: "",
       },
     ];
     SAMPLE_REQUEST.params = [
@@ -115,6 +119,7 @@ describe("getEffectiveRESTRequest", () => {
         key: "PARAM",
         value: "<<PARAM>>",
         active: true,
+        description: "",
       },
     ];
     SAMPLE_REQUEST.endpoint = "<<ENDPOINT>>";

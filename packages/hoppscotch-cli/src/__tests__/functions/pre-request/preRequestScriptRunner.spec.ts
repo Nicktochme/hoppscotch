@@ -7,7 +7,7 @@ import { preRequestScriptRunner } from "../../../utils/pre-request";
 import { describe, expect, test, beforeAll } from "vitest";
 
 
-import "@relmify/jest-fp-ts";
+//import "@relmify/jest-fp-ts";
 
 const SAMPLE_ENVS: HoppEnvs = {
   global: [],
@@ -21,6 +21,7 @@ const SAMPLE_REQUEST: HoppRESTRequest = {
   v: "1",
   name: "request",
   method: "GET",
+  requestVariables:[],
   endpoint: "<<ENDPOINT>>",
   params: [],
   headers: [],

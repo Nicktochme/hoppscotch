@@ -1,14 +1,11 @@
-import { Environment } from "@hoppscotch/data";
+import { Environment, EnvironmentVariable } from "@hoppscotch/data";
 import { getEffectiveFinalMetaData } from "../../../utils/getters";
 import { describe, expect, test } from "vitest";
 
 
-import "@relmify/jest-fp-ts";
+//import "@relmify/jest-fp-ts";
 
-const DEFAULT_ENV = <Environment>{
-  name: "name",
-  variables: [{ key: "PARAM", value: "parsed_param" }],
-};
+const DEFAULT_ENV = <EnvironmentVariable[]> [{ key: "PARAM", value: "parsed_param", secret: false }];
 
 describe("getEffectiveFinalMetaData", () => {
   test("Empty list of meta-data.", () => {
@@ -18,7 +15,7 @@ describe("getEffectiveFinalMetaData", () => {
   test("Non-empty active list of meta-data with unavailable ENV.", () => {
     expect(
       getEffectiveFinalMetaData(
-        [{ active: true, key: "<<UNKNOWN_KEY>>", value: "<<UNKNOWN_VALUE>>" }],
+        [{ value: "<<UNKNOWN_VALUE>>", key: "<<UNKNOWN_KEY>>", active: true, description: "" }],
         DEFAULT_ENV
       )
     ).toSubsetEqualRight([{ active: true, key: "", value: "" }]);
@@ -27,7 +24,7 @@ describe("getEffectiveFinalMetaData", () => {
   test("Inactive list of meta-data.", () => {
     expect(
       getEffectiveFinalMetaData(
-        [{ active: false, key: "KEY", value: "<<PARAM>>" }],
+        [{ value: "<<PARAM>>", key: "KEY", active: false, description: "" }],
         DEFAULT_ENV
       )
     ).toSubsetEqualRight([]);
@@ -36,7 +33,7 @@ describe("getEffectiveFinalMetaData", () => {
   test("Active list of meta-data.", () => {
     expect(
       getEffectiveFinalMetaData(
-        [{ active: true, key: "PARAM", value: "<<PARAM>>" }],
+        [{ value: "<<PARAM>>", key: "PARAM", active: true, description: "" }],
         DEFAULT_ENV
       )
     ).toSubsetEqualRight([
