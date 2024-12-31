@@ -33,6 +33,13 @@
       :filter-text="filterTexts"
       :save-request="saveRequest"
       :picked="picked"
+      @run-collection="
+        runCollectionHandler({
+          type: 'my-collections',
+          collectionID: $event.collection._ref_id,
+          collectionIndex: $event.collectionIndex,
+        })
+      "
       @add-folder="addFolder"
       @add-request="addRequest"
       @edit-request="editRequest"
@@ -99,7 +106,13 @@
       @remove-folder="removeFolder"
       @remove-request="removeRequest"
       @remove-response="removeResponse"
-      @run-collection="runCollectionHandler"
+      @run-collection="
+        runCollectionHandler({
+          type: 'team-collections',
+          collectionID: $event.collectionID,
+          path: $event.path,
+        })
+      "
       @share-request="shareRequest"
       @select-request="selectRequest"
       @select-response="selectResponse"
@@ -193,11 +206,9 @@
     />
 
     <!-- `selectedCollectionID` is guaranteed to be a string when `showCollectionsRunnerModal` is `true` -->
-    <CollectionsRunner
-      v-if="showCollectionsRunnerModal"
-      :collection-i-d="selectedCollectionID!"
-      :environment-i-d="activeEnvironmentID"
-      :selected-environment-index="selectedEnvironmentIndex"
+    <HttpTestRunnerModal
+      v-if="showCollectionsRunnerModal && collectionRunnerData"
+      :collection-runner-data="collectionRunnerData"
       @hide-modal="showCollectionsRunnerModal = false"
     />
   </div>
@@ -207,6 +218,7 @@
 import { useI18n } from "@composables/i18n"
 import { useToast } from "@composables/toast"
 import {
+  getDefaultRESTRequest,
   HoppCollection,
   HoppRESTAuth,
   HoppRESTHeaders,
@@ -218,7 +230,7 @@ import * as TE from "fp-ts/TaskEither"
 import { pipe } from "fp-ts/function"
 import { cloneDeep, debounce, isEqual } from "lodash-es"
 import { PropType, computed, nextTick, onMounted, ref, watch } from "vue"
-import { useReadonlyStream, useStream } from "~/composables/stream"
+import { useReadonlyStream } from "~/composables/stream"
 import { defineActionHandler, invokeAction } from "~/helpers/actions"
 import { GQLError } from "~/helpers/backend/GQLClient"
 import {
@@ -278,10 +290,7 @@ import {
   updateRESTCollectionOrder,
   updateRESTRequestOrder,
 } from "~/newstore/collections"
-import {
-  selectedEnvironmentIndex$,
-  setSelectedEnvironmentIndex,
-} from "~/newstore/environments"
+
 import { useLocalState } from "~/newstore/localstate"
 import { currentReorderingStatus$ } from "~/newstore/reordering"
 import { platform } from "~/platform"
@@ -292,7 +301,7 @@ import { TeamWorkspace, WorkspaceService } from "~/services/workspace.service"
 import { RESTOptionTabs } from "../http/RequestOptions.vue"
 import { Collection as NodeCollection } from "./MyCollections.vue"
 import { EditingProperties } from "./Properties.vue"
-import { getDefaultRESTRequest } from "~/helpers/rest/default"
+import { CollectionRunnerData } from "../http/test/RunnerModal.vue"
 
 const t = useI18n()
 const toast = useToast()
@@ -383,15 +392,6 @@ const teamLoadingCollections = useReadonlyStream(
   []
 )
 const teamEnvironmentAdapter = new TeamEnvironmentAdapter(undefined)
-const teamEnvironmentList = useReadonlyStream(
-  teamEnvironmentAdapter.teamEnvironmentList$,
-  []
-)
-const selectedEnvironmentIndex = useStream(
-  selectedEnvironmentIndex$,
-  { type: "NO_ENV_SELECTED" },
-  setSelectedEnvironmentIndex
-)
 
 const {
   cascadeParentCollectionForHeaderAuthForSearchResults,
@@ -692,8 +692,7 @@ const showConfirmModal = ref(false)
 const showTeamModalAdd = ref(false)
 
 const showCollectionsRunnerModal = ref(false)
-const selectedCollectionID = ref<string | null>(null)
-const activeEnvironmentID = ref<string | null | undefined>(null)
+const collectionRunnerData = ref<CollectionRunnerData | null>(null)
 
 const displayModalAdd = (show: boolean) => {
   showModalAdd.value = show
@@ -837,7 +836,9 @@ const onAddRequest = (requestName: string) => {
   if (!request) return
 
   const newRequest = {
-    ...cloneDeep(request),
+    ...(tabs.currentActiveTab.value.document.type === "request"
+      ? cloneDeep(tabs.currentActiveTab.value.document.request)
+      : getDefaultRESTRequest()),
     name: requestName,
   }
 
@@ -849,9 +850,9 @@ const onAddRequest = (requestName: string) => {
     const { auth, headers } = cascadeParentCollectionForHeaderAuth(path, "rest")
 
     tabs.createNewTab({
+      type: "request",
       request: newRequest,
       isDirty: false,
-      type: "request",
       saveContext: {
         originLocation: "user-collection",
         folderPath: path,
@@ -904,9 +905,9 @@ const onAddRequest = (requestName: string) => {
           const { auth, headers } =
             teamCollectionAdapter.cascadeParentCollectionForHeaderAuth(path)
           tabs.createNewTab({
+            type: "request",
             request: newRequest,
             isDirty: false,
-            type: "request",
             saveContext: {
               originLocation: "team-collection",
               requestID: createRequestInCollection.id,
@@ -1973,13 +1974,13 @@ const selectRequest = (selectedRequest: {
       requestID: requestIndex,
     })
 
-    if (possibleTab) {
+    if (possibleTab && possibleTab.value.document.type === "request") {
       tabs.setActiveTab(possibleTab.value.id)
     } else {
       tabs.createNewTab({
+        type: "request",
         request: cloneDeep(request),
         isDirty: false,
-        type: "request",
         saveContext: {
           originLocation: "team-collection",
           requestID: requestIndex,
@@ -2004,9 +2005,9 @@ const selectRequest = (selectedRequest: {
     } else {
       // If not, open the request in a new tab
       tabs.createNewTab({
+        type: "request",
         request: cloneDeep(request),
         isDirty: false,
-        type: "request",
         saveContext: {
           originLocation: "user-collection",
           folderPath: folderPath!,
@@ -2866,25 +2867,29 @@ const setCollectionProperties = (newCollection: {
   displayModalEditProperties(false)
 }
 
-const runCollectionHandler = (collectionID: string) => {
-  selectedCollectionID.value = collectionID
+const runCollectionHandler = (
+  payload: CollectionRunnerData & {
+    path?: string
+  }
+) => {
+  if (payload.path && collectionsType.value.type === "team-collections") {
+    const inheritedProperties =
+      teamCollectionAdapter.cascadeParentCollectionForHeaderAuth(payload.path)
+
+    if (inheritedProperties) {
+      collectionRunnerData.value = {
+        type: "team-collections",
+        collectionID: payload.collectionID,
+        inheritedProperties: inheritedProperties,
+      }
+    }
+  } else {
+    collectionRunnerData.value = {
+      type: "my-collections",
+      collectionID: payload.collectionID,
+    }
+  }
   showCollectionsRunnerModal.value = true
-
-  const activeWorkspace = workspace.value
-  const currentEnv = selectedEnvironmentIndex.value
-
-  if (["NO_ENV_SELECTED", "MY_ENV"].includes(currentEnv.type)) {
-    activeEnvironmentID.value = null
-    return
-  }
-
-  if (activeWorkspace.type === "team" && currentEnv.type === "TEAM_ENV") {
-    activeEnvironmentID.value = teamEnvironmentList.value.find(
-      (env) =>
-        env.teamID === activeWorkspace.teamID &&
-        env.environment.id === currentEnv.environment.id
-    )?.environment.id
-  }
 }
 
 const resolveConfirmModal = (title: string | null) => {

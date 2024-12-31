@@ -48,6 +48,7 @@ import {
   updateRESTRequestOrder,
 } from "@hoppscotch/common/newstore/collections"
 import {
+  generateUniqueRefId,
   GQLHeader,
   HoppCollection,
   HoppGQLRequest,
@@ -70,6 +71,7 @@ function initCollectionsSync() {
 
   gqlCollectionsSyncer.startStoreSync()
 
+  // TODO: fix collection schema transformation on backend maybe?
   loadUserCollections("REST")
   loadUserCollections("GQL")
 
@@ -94,6 +96,7 @@ function initCollectionsSync() {
 
 type ExportedUserCollectionREST = {
   id?: string
+  _ref_id?: string
   folders: ExportedUserCollectionREST[]
   requests: Array<HoppRESTRequest & { id: string }>
   name: string
@@ -102,6 +105,7 @@ type ExportedUserCollectionREST = {
 
 type ExportedUserCollectionGQL = {
   id?: string
+  _ref_id?: string
   folders: ExportedUserCollectionGQL[]
   requests: Array<HoppGQLRequest & { id: string }>
   name: string
@@ -130,11 +134,13 @@ function exportedCollectionToHoppCollection(
         : {
             auth: { authType: "inherit", authActive: false },
             headers: [],
+            _ref_id: generateUniqueRefId("coll"),
           }
 
     return {
       id: restCollection.id,
-      v: 4,
+      _ref_id: data._ref_id ?? generateUniqueRefId("coll"),
+      v: 5,
       name: restCollection.name,
       folders: restCollection.folders.map((folder) =>
         exportedCollectionToHoppCollection(folder, collectionType)
@@ -192,11 +198,13 @@ function exportedCollectionToHoppCollection(
         : {
             auth: { authType: "inherit", authActive: false },
             headers: [],
+            _ref_id: generateUniqueRefId("coll"),
           }
 
     return {
       id: gqlCollection.id,
-      v: 4,
+      _ref_id: data._ref_id ?? generateUniqueRefId("coll"),
+      v: 5,
       name: gqlCollection.name,
       folders: gqlCollection.folders.map((folder) =>
         exportedCollectionToHoppCollection(folder, collectionType)
@@ -366,6 +374,7 @@ function setupUserCollectionCreatedSubscription() {
             : {
                 auth: { authType: "inherit", authActive: false },
                 headers: [],
+                _ref_id: generateUniqueRefId("coll"),
               }
 
         runDispatchWithOutSyncing(() => {
@@ -374,7 +383,8 @@ function setupUserCollectionCreatedSubscription() {
                 name: res.right.userCollectionCreated.title,
                 folders: [],
                 requests: [],
-                v: 4,
+                v: 5,
+                _ref_id: data._ref_id,
                 auth: data.auth,
                 headers: addDescriptionField(data.headers),
               })
@@ -382,7 +392,8 @@ function setupUserCollectionCreatedSubscription() {
                 name: res.right.userCollectionCreated.title,
                 folders: [],
                 requests: [],
-                v: 4,
+                v: 5,
+                _ref_id: data._ref_id,
                 auth: data.auth,
                 headers: addDescriptionField(data.headers),
               })
@@ -594,6 +605,8 @@ function setupUserCollectionDuplicatedSubscription() {
               auth: { authType: "inherit", authActive: false },
               headers: [],
             }
+      // Duplicated collection will have a unique ref id
+      const _ref_id = generateUniqueRefId("coll")
 
       const folders = transformDuplicatedCollections(childCollectionsJSONStr)
 
@@ -607,7 +620,8 @@ function setupUserCollectionDuplicatedSubscription() {
         name,
         folders,
         requests,
-        v: 3,
+        v: 5,
+        _ref_id,
         auth,
         headers: addDescriptionField(headers),
       }
@@ -1028,6 +1042,8 @@ function transformDuplicatedCollections(
           ? JSON.parse(data)
           : { auth: { authType: "inherit", authActive: false }, headers: [] }
 
+      const _ref_id = generateUniqueRefId("coll")
+
       const folders = transformDuplicatedCollections(childCollectionsJSONStr)
 
       const requests = transformDuplicatedCollectionRequests(userRequests)
@@ -1037,7 +1053,8 @@ function transformDuplicatedCollections(
         name,
         folders,
         requests,
-        v: 3,
+        _ref_id,
+        v: 5,
         auth,
         headers: addDescriptionField(headers),
       }

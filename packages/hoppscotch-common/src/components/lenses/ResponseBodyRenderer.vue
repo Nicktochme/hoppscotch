@@ -26,7 +26,7 @@
       :info="`${maybeHeaders.length}`"
       class="flex flex-1 flex-col"
     >
-      <LensesHeadersRenderer v-model="maybeHeaders" />
+      <LensesHeadersRenderer v-model="maybeHeaders" :is-editable="false" />
     </HoppSmartTab>
     <HoppSmartTab
       v-if="!isEditable"
@@ -36,6 +36,18 @@
       class="flex flex-1 flex-col"
     >
       <HttpTestResult v-model="doc.testResults" />
+    </HoppSmartTab>
+    <HoppSmartTab
+      v-if="requestHeaders"
+      id="req-headers"
+      :label="t('response.request_headers')"
+      :info="`${requestHeaders?.length}`"
+      class="flex flex-1 flex-col"
+    >
+      <LensesHeadersRenderer
+        :model-value="requestHeaders"
+        :is-editable="false"
+      />
     </HoppSmartTab>
   </HoppSmartTabs>
 </template>
@@ -54,6 +66,7 @@ import { HoppRequestDocument } from "~/helpers/rest/document"
 const props = defineProps<{
   document: HoppRequestDocument
   isEditable: boolean
+  isTestRunner?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -102,6 +115,11 @@ const maybeHeaders = computed(() => {
   return doc.value.response.headers
 })
 
+const requestHeaders = computed(() => {
+  if (!props.isTestRunner || !doc.value) return null
+  return doc.value.request.headers
+})
+
 const validLenses = computed(() => {
   if (!doc.value.response) return []
   return getSuitableLenses(doc.value.response)
@@ -133,6 +151,7 @@ watch(
 )
 
 watch(selectedLensTab, (newLensID) => {
+  if (props.isTestRunner) return
   doc.value.responseTabPreference = newLensID
 })
 </script>
