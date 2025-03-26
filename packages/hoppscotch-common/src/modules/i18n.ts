@@ -13,6 +13,8 @@ import { getService } from "./dioc"
 
 import FALLBACK_LANG_MESSAGES from "../../locales/en.json"
 
+import messages from "@intlify/unplugin-vue-i18n/messages"
+
 /*
   In context of this file, we have 2 main kinds of things.
   1. Locale -> A locale is termed as the i18n entries present in the /locales folder
@@ -71,10 +73,10 @@ let i18nInstance: I18n<
   true
 > | null = null
 
-const resolveCurrentLocale = () =>
+const resolveCurrentLocale = async () =>
   pipe(
     // Resolve from locale and make sure it is in languages
-    persistenceService.getLocalConfig("locale"),
+    await persistenceService.getLocalConfig("locale"),
     O.fromNullable,
     O.filter((locale) =>
       pipe(
@@ -123,7 +125,7 @@ export const changeAppLanguage = async (locale: string) => {
   // TODO: Look into the type issues here
   i18nInstance.global.locale.value = locale
 
-  persistenceService.setLocalConfig("locale", locale)
+  await persistenceService.setLocalConfig("locale", locale)
 }
 
 /**
@@ -134,12 +136,13 @@ export function getI18n() {
 }
 
 export default <HoppModule>{
-  onVueAppInit(app) {
+  async onVueAppInit(app) {
     const i18n = createI18n(<I18nOptions>{
       locale: "en", // TODO: i18n system!
       fallbackLocale: "en",
       legacy: false,
       allowComposition: true,
+      messages,
     })
 
     app.use(i18n)
@@ -153,10 +156,10 @@ export default <HoppModule>{
     )
 
     // TODO: Global loading state to hide the resolved lang loading
-    const currentLocale = resolveCurrentLocale()
+    const currentLocale = await resolveCurrentLocale()
     changeAppLanguage(currentLocale)
 
-    persistenceService.setLocalConfig("locale", currentLocale)
+    await persistenceService.setLocalConfig("locale", currentLocale)
   },
   onBeforeRouteChange(to, _, router) {
     // Convert old locale path format to new format

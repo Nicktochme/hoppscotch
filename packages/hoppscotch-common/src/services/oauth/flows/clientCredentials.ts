@@ -6,11 +6,14 @@ import {
 import { z } from "zod"
 import { getService } from "~/modules/dioc"
 import * as E from "fp-ts/Either"
-import { InterceptorService } from "~/services/interceptor.service"
+import * as O from "fp-ts/Option"
 import { useToast } from "~/composables/toast"
 import { ClientCredentialsGrantTypeParams } from "@hoppscotch/data"
+import { KernelInterceptorService } from "~/services/kernel-interceptor.service"
+import { RelayRequest, content } from "@hoppscotch/kernel"
+import { parseBytesToJSON } from "~/helpers/functional/json"
 
-const interceptorService = getService(InterceptorService)
+const interceptorService = getService(KernelInterceptorService)
 
 const ClientCredentialsFlowParamsSchema = ClientCredentialsGrantTypeParams.pick(
   {
@@ -18,6 +21,7 @@ const ClientCredentialsFlowParamsSchema = ClientCredentialsGrantTypeParams.pick(
     clientID: true,
     clientSecret: true,
     scopes: true,
+    clientAuthentication: true,
   }
 ).refine(
   (params) => {
@@ -42,37 +46,20 @@ export const getDefaultClientCredentialsFlowParams =
     clientID: "",
     clientSecret: "",
     scopes: undefined,
+    clientAuthentication: "IN_BODY",
   })
 
-const initClientCredentialsOAuthFlow = async ({
-  clientID,
-  clientSecret,
-  scopes,
-  authEndpoint,
-}: ClientCredentialsFlowParams) => {
+const initClientCredentialsOAuthFlow = async (
+  payload: ClientCredentialsFlowParams
+) => {
   const toast = useToast()
 
-  const formData = new URLSearchParams()
-  formData.append("grant_type", "client_credentials")
-  formData.append("client_id", clientID)
+  const requestPayload =
+    payload.clientAuthentication === "AS_BASIC_AUTH_HEADERS"
+      ? getPayloadForViaBasicAuthHeader(payload)
+      : getPayloadForViaBody(payload)
 
-  if (clientSecret) {
-    formData.append("client_secret", clientSecret)
-  }
-
-  if (scopes) {
-    formData.append("scope", scopes)
-  }
-
-  const { response } = interceptorService.runRequest({
-    url: authEndpoint,
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Accept: "application/json",
-    },
-    data: formData.toString(),
-  })
+  const { response } = interceptorService.execute(requestPayload)
 
   const res = await response
 
@@ -80,18 +67,16 @@ const initClientCredentialsOAuthFlow = async ({
     return E.left("AUTH_TOKEN_REQUEST_FAILED" as const)
   }
 
-  const responsePayload = decodeResponseAsJSON(res.right)
+  const jsonResponse = decodeResponseAsJSON(res.right)
 
-  if (E.isLeft(responsePayload)) {
-    return E.left("AUTH_TOKEN_REQUEST_FAILED" as const)
-  }
+  if (E.isLeft(jsonResponse)) return E.left("AUTH_TOKEN_REQUEST_FAILED")
 
   const withAccessTokenSchema = z.object({
     access_token: z.string(),
   })
 
   const parsedTokenResponse = withAccessTokenSchema.safeParse(
-    responsePayload.right
+    jsonResponse.right
   )
 
   if (!parsedTokenResponse.success) {
@@ -137,21 +122,21 @@ const handleRedirectForAuthCodeOauthFlow = async (localConfig: string) => {
     return E.left("INVALID_STATE")
   }
 
-  // exchange the code for a token
-  const formData = new URLSearchParams()
-  formData.append("code", code)
-  formData.append("client_id", decodedLocalConfig.data.clientID)
-  formData.append("client_secret", decodedLocalConfig.data.clientSecret)
-  formData.append("redirect_uri", OauthAuthService.redirectURI)
-
-  const { response } = interceptorService.runRequest({
+  const { response } = interceptorService.execute({
+    id: Date.now(),
     url: decodedLocalConfig.data.tokenEndpoint,
     method: "POST",
+    version: "HTTP/1.1",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
       Accept: "application/json",
     },
-    data: formData.toString(),
+    content: content.urlencoded({
+      code,
+      client_id: decodedLocalConfig.data.clientID,
+      client_secret: decodedLocalConfig.data.clientSecret,
+      redirect_uri: OauthAuthService.redirectURI,
+    }),
   })
 
   const res = await response
@@ -160,21 +145,24 @@ const handleRedirectForAuthCodeOauthFlow = async (localConfig: string) => {
     return E.left("AUTH_TOKEN_REQUEST_FAILED" as const)
   }
 
-  const responsePayload = new TextDecoder("utf-8")
-    .decode(res.right.data as any)
-    .replaceAll("\x00", "")
-
   const withAccessTokenSchema = z.object({
     access_token: z.string(),
   })
 
-  const parsedTokenResponse = withAccessTokenSchema.safeParse(
-    JSON.parse(responsePayload)
+  const responsePayload = parseBytesToJSON<{ access_token: string }>(
+    res.right.body.body
   )
 
-  return parsedTokenResponse.success
-    ? E.right(parsedTokenResponse.data)
-    : E.left("AUTH_TOKEN_REQUEST_INVALID_RESPONSE" as const)
+  if (O.isSome(responsePayload)) {
+    const parsedTokenResponse = withAccessTokenSchema.safeParse(
+      responsePayload.value
+    )
+    return parsedTokenResponse.success
+      ? E.right(parsedTokenResponse.data)
+      : E.left("AUTH_TOKEN_REQUEST_INVALID_RESPONSE" as const)
+  }
+
+  return E.left("AUTH_TOKEN_REQUEST_INVALID_RESPONSE" as const)
 }
 
 export default createFlowConfig(
@@ -183,3 +171,50 @@ export default createFlowConfig(
   initClientCredentialsOAuthFlow,
   handleRedirectForAuthCodeOauthFlow
 )
+
+const getPayloadForViaBasicAuthHeader = (
+  payload: Omit<ClientCredentialsFlowParams, "clientAuthentication">
+): RelayRequest => {
+  const { clientID, clientSecret, scopes, authEndpoint } = payload
+
+  const basicAuthToken = btoa(`${clientID}:${clientSecret}`)
+
+  return {
+    id: Date.now(),
+    url: authEndpoint,
+    method: "POST",
+    version: "HTTP/1.1",
+    headers: {
+      Authorization: `Basic ${basicAuthToken}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+      Accept: "application/json",
+    },
+    content: content.urlencoded({
+      grant_type: "client_credentials",
+      ...(scopes && { scope: scopes }),
+    }),
+  }
+}
+
+const getPayloadForViaBody = (
+  payload: Omit<ClientCredentialsFlowParams, "clientAuthentication">
+): RelayRequest => {
+  const { clientID, clientSecret, scopes, authEndpoint } = payload
+
+  return {
+    id: Date.now(),
+    url: authEndpoint,
+    method: "POST",
+    version: "HTTP/1.1",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Accept: "application/json",
+    },
+    content: content.urlencoded({
+      grant_type: "client_credentials",
+      client_id: clientID,
+      ...(clientSecret && { client_secret: clientSecret }),
+      ...(scopes && { scope: scopes }),
+    }),
+  }
+}

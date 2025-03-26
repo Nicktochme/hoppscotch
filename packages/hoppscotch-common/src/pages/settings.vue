@@ -87,53 +87,70 @@
                   <label class="text-secondaryLight">{{
                     t("settings.ai_request_naming_style")
                   }}</label>
-                  <div class="flex">
-                    <tippy
-                      interactive
-                      trigger="click"
-                      theme="popover"
-                      :on-shown="() => namingStyleTippyActions?.focus()"
-                    >
-                      <HoppSmartSelectWrapper>
-                        <HoppButtonSecondary
-                          class="flex flex-1 !justify-start rounded-none pr-8"
-                          :label="activeNamingStyle?.label"
-                          outline
-                        />
-                      </HoppSmartSelectWrapper>
-                      <template #content="{ hide }">
-                        <div
-                          ref="namingStyleTippyActions"
-                          class="flex flex-col focus:outline-none"
-                          tabindex="0"
-                          @keyup.escape="hide()"
-                        >
-                          <HoppSmartLink
-                            v-for="style in supportedNamingStyles"
-                            :key="style"
-                            class="flex flex-1"
-                            @click="
-                              () => {
-                                AI_REQUEST_NAMING_STYLE = style.id
-                                hide()
-                              }
-                            "
+                  <div class="flex flex-col space-y-4">
+                    <div class="flex">
+                      <tippy
+                        interactive
+                        trigger="click"
+                        theme="popover"
+                        :on-shown="() => namingStyleTippyActions?.focus()"
+                      >
+                        <HoppSmartSelectWrapper>
+                          <HoppButtonSecondary
+                            class="flex flex-1 !justify-start rounded-none pr-8"
+                            :label="activeNamingStyle?.label"
+                            outline
+                          />
+                        </HoppSmartSelectWrapper>
+                        <template #content="{ hide }">
+                          <div
+                            ref="namingStyleTippyActions"
+                            class="flex flex-col focus:outline-none"
+                            tabindex="0"
+                            @keyup.escape="hide()"
                           >
-                            <HoppSmartItem
-                              :label="style.label"
-                              :active-info-icon="
-                                AI_REQUEST_NAMING_STYLE === style.id
+                            <HoppSmartLink
+                              v-for="style in supportedNamingStyles"
+                              :key="style.id"
+                              class="flex flex-1"
+                              @click="
+                                () => {
+                                  AI_REQUEST_NAMING_STYLE = style.id
+                                  hide()
+                                }
                               "
-                              :info-icon="
-                                AI_REQUEST_NAMING_STYLE === style.id
-                                  ? IconDone
-                                  : null
-                              "
-                            />
-                          </HoppSmartLink>
-                        </div>
-                      </template>
-                    </tippy>
+                            >
+                              <HoppSmartItem
+                                :label="style.label"
+                                :active-info-icon="
+                                  AI_REQUEST_NAMING_STYLE === style.id
+                                "
+                                :info-icon="
+                                  AI_REQUEST_NAMING_STYLE === style.id
+                                    ? IconDone
+                                    : null
+                                "
+                              />
+                            </HoppSmartLink>
+                          </div>
+                        </template>
+                      </tippy>
+                    </div>
+                    <div
+                      v-if="AI_REQUEST_NAMING_STYLE === 'CUSTOM'"
+                      class="flex"
+                    >
+                      <textarea
+                        v-model="CUSTOM_NAMING_STYLE"
+                        class="flex flex-1 bg-primaryLight px-4 py-2 rounded border border-dividerLight focus:border-divider transition resize-none"
+                        :placeholder="
+                          t(
+                            'settings.ai_request_naming_style_custom_placeholder'
+                          )
+                        "
+                        rows="4"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -180,6 +197,7 @@
         </div>
       </div>
 
+      <!-- NOTE: Old interceptors
       <div class="md:grid md:grid-cols-3 md:gap-4">
         <div class="p-8 md:col-span-1">
           <h3 class="heading">
@@ -199,6 +217,35 @@
           <section v-for="[id, settings] in interceptorsWithSettings" :key="id">
             <h4 class="font-semibold text-secondaryDark">
               {{ settings.entryTitle(t) }}
+            </h4>
+            <component :is="settings.component" />
+          </section>
+        </div>
+      </div>
+      -->
+
+      <div class="md:grid md:grid-cols-3 md:gap-4">
+        <div class="p-8 md:col-span-1">
+          <h3 class="heading">
+            {{ t("settings.kernel_interceptor") }}
+          </h3>
+          <p class="my-1 text-secondaryLight">
+            {{ t("settings.kernel_interceptor_description") }}
+          </p>
+        </div>
+        <div class="space-y-8 p-8 md:col-span-2">
+          <section class="flex flex-col space-y-2">
+            <h4 class="font-semibold text-secondaryDark">
+              {{ t("settings.kernel_interceptor") }}
+            </h4>
+            <AppKernelInterceptor :is-tooltip-component="false" />
+          </section>
+          <section
+            v-for="[id, settings] in kernelInterceptorsWithSettings"
+            :key="id"
+          >
+            <h4 class="font-semibold text-secondaryDark">
+              {{ settings.title(t) }}
             </h4>
             <component :is="settings.component" />
           </section>
@@ -231,19 +278,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from "vue"
-import { applySetting, toggleSetting } from "~/newstore/settings"
+import { ref, computed } from "vue"
+import { toggleSetting } from "~/newstore/settings"
 import { useSetting } from "@composables/settings"
 import { useI18n } from "@composables/i18n"
 import { useColorMode } from "@composables/theming"
 import { usePageHead } from "@composables/head"
 import { useService } from "dioc/vue"
-import { InterceptorService } from "~/services/interceptor.service"
+// NOTE: Old interceptors
+// import { InterceptorService } from "~/services/interceptor.service"
 import { pipe } from "fp-ts/function"
 import * as O from "fp-ts/Option"
 import * as A from "fp-ts/Array"
 import { platform } from "~/platform"
 import IconDone from "~icons/lucide/check"
+import { KernelInterceptorService } from "~/services/kernel-interceptor.service"
 
 const t = useI18n()
 const colorMode = useColorMode()
@@ -252,28 +301,46 @@ usePageHead({
   title: computed(() => t("navigation.settings")),
 })
 
-const interceptorService = useService(InterceptorService)
-const interceptorsWithSettings = computed(() =>
+const kernelInterceptorService: KernelInterceptorService = useService(
+  KernelInterceptorService
+)
+const kernelInterceptorsWithSettings = computed(() =>
   pipe(
-    interceptorService.availableInterceptors.value,
-    A.filterMap((interceptor) =>
-      interceptor.settingsPageEntry
+    kernelInterceptorService.available.value,
+    A.filterMap((kernelInterceptor) =>
+      kernelInterceptor.settingsEntry
         ? O.some([
-            interceptor.interceptorID,
-            interceptor.settingsPageEntry,
+            kernelInterceptor.id,
+            kernelInterceptor.settingsEntry,
           ] as const)
         : O.none
     )
   )
 )
 
+// NOTE: Old interceptors
+// const interceptorService: InterceptorService = useService(InterceptorService)
+// const interceptorsWithSettings = computed(() =>
+//   pipe(
+//     interceptorService.availableInterceptors.value,
+//     A.filterMap((interceptor) =>
+//       interceptor.settingsPageEntry
+//         ? O.some([
+//             interceptor.interceptorID,
+//             interceptor.settingsPageEntry,
+//           ] as const)
+//         : O.none
+//     )
+//   )
+// )
+
 const ACCENT_COLOR = useSetting("THEME_COLOR")
-const PROXY_URL = useSetting("PROXY_URL")
 const TELEMETRY_ENABLED = useSetting("TELEMETRY_ENABLED")
 const EXPAND_NAVIGATION = useSetting("EXPAND_NAVIGATION")
 const SIDEBAR_ON_LEFT = useSetting("SIDEBAR_ON_LEFT")
 const ENABLE_AI_EXPERIMENTS = useSetting("ENABLE_AI_EXPERIMENTS")
 const AI_REQUEST_NAMING_STYLE = useSetting("AI_REQUEST_NAMING_STYLE")
+const CUSTOM_NAMING_STYLE = useSetting("CUSTOM_NAMING_STYLE")
 
 const supportedNamingStyles = [
   {
@@ -292,6 +359,10 @@ const supportedNamingStyles = [
     id: "PascalCase" as const,
     label: t("settings.ai_request_naming_style_pascal_case"),
   },
+  {
+    id: "CUSTOM" as const,
+    label: t("settings.ai_request_naming_style_custom"),
+  },
 ]
 
 const activeNamingStyle = computed(() =>
@@ -304,20 +375,8 @@ const hasPlatformTelemetry = Boolean(platform.platformFeatureFlags.hasTelemetry)
 
 const confirmRemove = ref(false)
 
-const proxySettings = computed(() => ({
-  url: PROXY_URL.value,
-}))
-
 const hasAIExperimentsSupport =
   !!platform.experiments?.aiExperiments?.enableAIExperiments
-
-watch(
-  proxySettings,
-  ({ url }) => {
-    applySetting("PROXY_URL", url)
-  },
-  { deep: true }
-)
 
 const showConfirmModal = () => {
   if (TELEMETRY_ENABLED.value) confirmRemove.value = true

@@ -371,7 +371,7 @@ const currentUser = useReadonlyStream(
 )
 const myCollections = useReadonlyStream(restCollections$, [], "deep")
 
-// Draging
+// Dragging
 const draggingToRoot = ref(false)
 const collectionMoveLoading = ref<string[]>([])
 const requestMoveLoading = ref<string[]>([])
@@ -440,9 +440,9 @@ const persistenceService = useService(PersistenceService)
 
 const collectionPropertiesModalActiveTab = ref<RESTOptionTabs>("headers")
 
-onMounted(() => {
+onMounted(async () => {
   const localOAuthTempConfig =
-    persistenceService.getLocalConfig("oauth_temp_config")
+    await persistenceService.getLocalConfig("oauth_temp_config")
 
   if (!localOAuthTempConfig) {
     return
@@ -457,9 +457,8 @@ onMounted(() => {
 
   if (context?.type === "collection-properties") {
     // load the unsaved editing properties
-    const unsavedCollectionPropertiesString = persistenceService.getLocalConfig(
-      "unsaved_collection_properties"
-    )
+    const unsavedCollectionPropertiesString =
+      await persistenceService.getLocalConfig("unsaved_collection_properties")
 
     if (unsavedCollectionPropertiesString) {
       const unsavedCollectionProperties: EditingProperties = JSON.parse(
@@ -481,7 +480,7 @@ onMounted(() => {
       editingProperties.value = unsavedCollectionProperties
     }
 
-    persistenceService.removeLocalConfig("oauth_temp_config")
+    await persistenceService.removeLocalConfig("oauth_temp_config")
     collectionPropertiesModalActiveTab.value = "authorization"
     showModalEditProperties.value = true
   }
@@ -1942,7 +1941,7 @@ const selectPicked = (payload: Picked | null) => {
 
 /**
  * This function is called when the user clicks on a request
- * @param selectedRequest The request that the user clicked on emited from the collection tree
+ * @param selectedRequest The request that the user clicked on emitted from the collection tree
  */
 const selectRequest = (selectedRequest: {
   request: HoppRESTRequest
@@ -2642,7 +2641,7 @@ const initializeDownloadCollection = async (
   collectionJSON: string,
   name: string | null
 ) => {
-  const result = await platform.io.saveFileWithDialog({
+  const result = await platform.kernelIO.saveFileWithDialog({
     data: collectionJSON,
     contentType: "application/json",
     suggestedFilename: `${name ?? "collection"}.json`,
@@ -2666,7 +2665,7 @@ const initializeDownloadCollection = async (
  */
 const exportData = async (collection: HoppCollection | TeamCollection) => {
   if (collectionsType.value.type === "my-collections") {
-    const collectionJSON = JSON.stringify(collection)
+    const collectionJSON = JSON.stringify(collection, null, 2)
 
     const name = (collection as HoppCollection).name
 
@@ -2685,7 +2684,7 @@ const exportData = async (collection: HoppCollection | TeamCollection) => {
         },
         async (coll) => {
           const hoppColl = teamCollToHoppRESTColl(coll)
-          const collectionJSONString = JSON.stringify(hoppColl)
+          const collectionJSONString = JSON.stringify(hoppColl, null, 2)
 
           await initializeDownloadCollection(
             collectionJSONString,

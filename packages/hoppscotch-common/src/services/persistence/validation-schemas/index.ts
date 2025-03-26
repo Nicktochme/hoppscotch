@@ -8,6 +8,7 @@ import {
   HoppRESTHeaders,
   HoppRESTRequestResponse,
   HoppCollection,
+  GlobalEnvironment,
 } from "@hoppscotch/data"
 import { entityReference } from "verzod"
 import { z } from "zod"
@@ -35,6 +36,7 @@ const SettingsDefSchema = z.object({
   syncEnvironments: z.boolean(),
   PROXY_URL: z.string(),
   CURRENT_INTERCEPTOR_ID: z.string(),
+  CURRENT_KERNEL_INTERCEPTOR_ID: z.string(),
   URL_EXCLUDES: z.object({
     auth: z.boolean(),
     httpUser: z.boolean(),
@@ -79,6 +81,7 @@ const SettingsDefSchema = z.object({
     .string()
     .optional()
     .catch("DESCRIPTIVE_WITH_SPACES"),
+  CUSTOM_NAMING_STYLE: z.string().optional().catch(""),
 })
 
 const HoppRESTRequestSchema = entityReference(HoppRESTRequest)
@@ -153,6 +156,8 @@ export const REST_COLLECTION_SCHEMA = HoppRESTCollectionSchema
 export const GQL_COLLECTION_SCHEMA = HoppGQLCollectionSchema
 
 export const ENVIRONMENTS_SCHEMA = z.array(entityReference(Environment))
+
+export const GLOBAL_ENVIRONMENT_SCHEMA = entityReference(GlobalEnvironment)
 
 export const SELECTED_ENV_INDEX_SCHEMA = z.nullable(
   z.discriminatedUnion("type", [
@@ -328,6 +333,7 @@ export const GQL_TAB_STATE_SCHEMA = z
             responseTabPreference: z.optional(z.string()),
             optionTabPreference: z.optional(z.enum(validGqlOperations)),
             inheritedProperties: z.optional(HoppInheritedPropertySchema),
+            cursorPosition: z.optional(z.number()),
           })
           .strict(),
       })
